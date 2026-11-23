@@ -966,11 +966,62 @@ theorem iteratedWirtinger_exponentialDecay (conjugate : Bool) (m : ℕ) {a : ℝ
     ∃ D : 𝓔(ℂ, 2, Ioi a) →L[ℂ] 𝓔(ℂ, 2, Ioi (a + m)),
       ∀ f z, (D f).val z = ((wirtinger(conjugate))^[m] zeroExtension(f.val)) z.val := by sorry
 
+/-- Every output weight of the derivative comes from the input weight one lower;
+the initial topology of all twists makes this a continuous endomorphism. -/
+private theorem iteratedDeriv_allExponentialDecay_step :
+    ∃ D : 𝓔(ℝ, 1, univ) →L[ℂ] 𝓔(ℝ, 1, univ),
+      ∀ f x, (D f).val x = deriv zeroExtension(f.val) x.val := by
+  let n := archimedeanUnitModulation ℝ 1
+  let I : Set ℝ := univ
+  let J : Set ℝ := univ
+  let E := ModulatedExponentialDecay n I
+  let d (f : E) (x : ℝˣ) := deriv zeroExtension(f.val) x.val
+  have htwist (c : J) : ∃ U : E →L[ℂ] SchwartzBruhat ℝˣ,
+      ∀ f, (U f).val = modulationWeight n c (d f) := by
+    let b : I := ⟨c.val - 1, mem_univ _⟩
+    let W : E →L[ℂ] SchwartzBruhat ℝˣ := ⟨modulatedExponentialDecayTwist n I b,
+      (continuous_apply b).comp (iteratedDeriv_exponentialDecay_inducing I).continuous⟩
+    refine (iteratedDeriv_exponentialDecay_onTwist b).elim fun T hT ↦ ?_
+    refine ⟨T.comp W, fun f ↦ funext fun x ↦ ?_⟩
+    have h := hT f.val (W f) (fun y ↦ iteratedDeriv_exponentialDecay_weight b f.val y) x
+    refine h.trans ?_
+    rw [show (b : ℝ) + 1 = c.val from sub_add_cancel _ _, iteratedDeriv_exponentialDecay_weight]
+  let c₀ : J := ⟨0, mem_univ _⟩
+  let U := (htwist c₀).choose
+  let L : E →ₗ[ℂ] (ℝˣ → ℂ) := (modulationWeight n (-c₀.val)).comp
+    ((schwartzBruhatSubmodule ℝˣ).subtype.comp U.toLinearMap)
+  have hL (f : E) : L f = d f := by
+    funext x
+    change modulationWeight n (-c₀.val) (U f).val x = _
+    rw [(htwist c₀).choose_spec f, iteratedDeriv_exponentialDecay_weight,
+      iteratedDeriv_exponentialDecay_weight, ← mul_assoc, ← Complex.ofReal_mul,
+      ← Real.rpow_add (abs_pos.mpr x.ne_zero), neg_add_cancel, Real.rpow_zero, Complex.ofReal_one, one_mul]
+  let D := L.codRestrict (modulatedExponentialDecaySubmodule n J) fun f ↦
+    (Submodule.mem_iInf _).mpr fun c ↦ Submodule.mem_comap.mpr (by
+      change modulationWeight n c (L f) ∈ schwartzBruhatSubmodule ℝˣ
+      rw [hL f, ← (htwist c).choose_spec f]
+      exact ((htwist c).choose f).property)
+  refine ⟨⟨D, (iteratedDeriv_exponentialDecay_inducing J).continuous_iff.mpr (continuous_pi fun c ↦ ?_)⟩, fun f ↦ congrFun (hL f)⟩
+  exact (htwist c).choose.continuous.congr fun f ↦ Subtype.ext
+    (((htwist c).choose_spec f).trans (congrArg (modulationWeight n c) (hL f).symm))
+
 /-- Paper: Proposition 5.3.3.2(2)(1), p. 249.
 Ordinary derivatives act continuously on the punctured real space with decay at all exponents. -/
 theorem iteratedDeriv_allExponentialDecay (m : ℕ) :
     ∃ D : 𝓔(ℝ, 1, univ) →L[ℂ] 𝓔(ℝ, 1, univ),
-      ∀ f x, (D f).val x = iteratedDeriv m zeroExtension(f.val) x.val := by sorry
+      ∀ f x, (D f).val x = iteratedDeriv m zeroExtension(f.val) x.val := by
+  induction m with
+  | zero =>
+    refine ⟨ContinuousLinearMap.id ℂ _, fun f x ↦ ?_⟩
+    change f.val x = iteratedDeriv 0 _ x.val
+    simp only [iteratedDeriv_zero, dite_eq_left x.ne_zero]
+    exact congrArg f.val (Units.ext rfl)
+  | succ m ih =>
+    obtain ⟨A, hA⟩ := ih
+    obtain ⟨B, hB⟩ := iteratedDeriv_allExponentialDecay_step
+    refine ⟨B.comp A, fun f x ↦ ?_⟩
+    exact (hB (A f) x).trans
+      (iteratedDeriv_exponentialDecay_succ m (A f).val zeroExtension(f.val) (hA f) x)
 
 /-- Paper: Proposition 5.3.3.2(2)(2), p. 250.
 Both iterated Wirtinger operators preserve the punctured complex space with decay at all
@@ -1307,7 +1358,72 @@ theorem archimedeanWeightedSchwartz_frechet {I : Set ℝ} (_ho : IsOpen I)
 /-- Paper: Lemma 5.3.3.3(1), p. 252.
 For an open nonempty interval the weighted Schwartz–Bruhat space is separable. -/
 theorem archimedeanWeightedSchwartz_separable {I : Set ℝ} (_ho : IsOpen I)
-    (_hi : OrdConnected I) (_hne : I.Nonempty) : SeparableSpace 𝓦(I) := by sorry
+    (_hi : OrdConnected I) (_hne : I.Nonempty) : SeparableSpace 𝓦(I) := by
+  classical
+  have sep {E : Type _} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+      [FirstCountableTopology E] (h : IsNuclearTVS.{0} E) : SeparableSpace E := by
+    let := h.1
+    let := h.2.1
+    let := PolynormableSpace.isTopologicalAddGroup ℂ E
+    have hw := PolynormableSpace.withSeminorms ℂ E
+    let : ContinuousSMul ℂ E := hw.continuousSMul
+    obtain ⟨U, hU⟩ := (𝓝 (0 : E)).exists_antitone_basis
+    have hex (n : ℕ) : ∃ q : Seminorm ℂ E, Continuous q ∧ ∃ r > 0, q.ball 0 r ⊆ U n := by
+      obtain ⟨s, r, hr, hsub⟩ := (hw.mem_nhds_iff 0 (U n)).mp (hU.mem n)
+      refine ⟨s.sup fun p : {p : Seminorm ℂ E // Continuous p} ↦ p.1, ?_, r, hr, hsub⟩
+      exact hw.continuous_finsetSup_seminorm s
+    choose q hq r hr hsub using hex
+    have hsep (n : ℕ) : SeparableSpace (WithLocalSeminorm (q n)) :=
+      seminorm_separable_of_nuclear h (q n) (hq n)
+    have hd (n : ℕ) : ∃ d : ℕ → E, ∀ x : E, ∃ m, q n (x - d m) < r n := by
+      obtain ⟨d, hd⟩ := exists_dense_seq (WithLocalSeminorm (q n))
+      refine ⟨d, fun x ↦ ?_⟩
+      let x' : WithLocalSeminorm (q n) := x
+      obtain ⟨m, hm⟩ := hd.exists_dist_lt x' (hr n)
+      rw [dist_eq_norm] at hm
+      exact ⟨m, hm⟩
+    choose d hd using hd
+    refine ⟨range fun m : ℕ × ℕ ↦ d m.1 m.2, countable_range _, ?_⟩
+    intro x
+    rw [mem_closure_iff_nhds]
+    intro W hW
+    have hW0 : (fun y ↦ x + y) ⁻¹' W ∈ 𝓝 (0 : E) :=
+      (continuous_const.add continuous_id).continuousAt.preimage_mem_nhds (by simpa using hW)
+    obtain ⟨n, -, hn⟩ := hU.1.mem_iff.mp hW0
+    obtain ⟨m, hm⟩ := hd n x
+    refine ⟨d n m, ?_, ⟨(n, m), rfl⟩⟩
+    have : d n m - x ∈ U n := hsub n (by rw [Seminorm.mem_ball, sub_zero, map_sub_rev]; exact hm)
+    simpa using hn this
+  let : SecondCountableTopology ℝˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let : SecondCountableTopology ℂˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let X := SchwartzBruhat (archMul(ι, κ))
+  let Z := weights(ι, κ, I)
+  let t : 𝓦(I) →ₗ[ℂ] (Z → X) := LinearMap.pi (archimedeanSchwartzTwist I)
+  let : PolynormableSpace ℂ X := (schwartzBruhat_nuclear.{0} (G := archMul(ι, κ))).2.1
+  have hp := withSeminorms_pi fun _ : Z ↦ PolynormableSpace.withSeminorms ℂ X
+  have hs := withGeneratingSeminorms_spec (archimedeanWeightedSchwartzSubmodule (ι := ι) (κ := κ) I)
+    (fun i : Z × {p : Seminorm ℂ X // Continuous p} ↦ i.2.val.comp (archimedeanSchwartzTwist I i.1))
+  have ht : Topology.IsEmbedding t := by
+    constructor
+    · constructor
+      refine hs.topologicalSpace_eq_iInf.trans ?_
+      refine Eq.trans ?_ (WithSeminorms.topologicalSpace_eq_iInf
+        (t := TopologicalSpace.induced t inferInstance) (t.withSeminorms_induced hp)).symm
+      rw [iInf_sigma, iInf_prod]
+      rfl
+    · intro f g h
+      let a : Z := (fun _ ↦ ⟨0, Set.mem_insert _ _⟩, fun _ ↦ ⟨0, Set.mem_insert _ _⟩)
+      apply Subtype.ext
+      funext u
+      have hu := congrArg (fun v : X ↦ v u) (congrFun h a)
+      change archimedeanSchwartzTwist I a f u = archimedeanSchwartzTwist I a g u at hu
+      have hv := (archimedeanSchwartzTwist_apply I a f u).symm.trans
+        (hu.trans (archimedeanSchwartzTwist_apply I a g u))
+      simpa [a] using hv
+  have hn : IsNuclearTVS.{0} 𝓦(I) := isNuclearTVS_of_linearEmbedding t ht
+    (isNuclearTVS_pi fun _ : Z ↦ schwartzBruhat_nuclear (G := archMul(ι, κ)))
+  obtain ⟨_, -, _, -⟩ := archimedeanWeightedSchwartz_frechet (ι := ι) (κ := κ) _ho _hi _hne
+  exact sep hn
 
 /-- Paper: Lemma 5.3.3.3(1), p. 252.
 For an open nonempty interval the weighted Schwartz–Bruhat space is nuclear. -/
@@ -2510,7 +2626,21 @@ The principal value preserves the kernel of each homogeneous theta transform. -/
 theorem sAdelePrincipalValue_preserves_homogeneousThetaKernel {T : Finset V} (hT : T ⊆ S)
     (ψ : PontryaginDual J₁) :
     LinearMap.ker (thetaAt(ψ)) ≤
-      (LinearMap.ker (thetaAt(ψ))).comap (sAdelePrincipalValue F hT) := by sorry
+      (LinearMap.ker (thetaAt(ψ))).comap (sAdelePrincipalValue F hT) := by
+  let K := LinearMap.ker (thetaAt(ψ))
+  let A := (existsUnique_sLocalThetaIsotypicAverage (F := F) (S := S) ψ).exists.choose
+  obtain ⟨e, he⟩ := (sLocalThetaIsotypicAverage_equiv (F := F) (S := S) ψ).2
+  intro f hf
+  have hz : K.mkQ f = 0 := (Submodule.Quotient.mk_eq_zero K).mpr hf
+  have hA : A (Submodule.Quotient.mk f) = 0 := (he f).symm.trans
+    (congrArg Subtype.val ((congrArg e hz).trans e.map_zero))
+  have hcomm := sLocalThetaPrincipalValue_isotypicAverage (F := F) hT ψ (Submodule.Quotient.mk f)
+  have hzero : A (Submodule.Quotient.mk (sAdelePrincipalValue F hT f)) = 0 :=
+    hcomm.symm.trans ((congrArg (sLocalThetaPrincipalValue F hT) hA).trans (map_zero _))
+  apply (Submodule.Quotient.mk_eq_zero K).mp
+  apply e.injective
+  apply Subtype.ext
+  exact ((he _).trans hzero).trans (congrArg Subtype.val e.map_zero).symm
 
 /-- Paper: Proposition 5.3.4.5(3), p. 264.
 Weil's operator on homogeneous theta classes is induced by its action on tests. -/
@@ -2531,7 +2661,44 @@ The closed embedding of Lemma 5.3.1.5 restricts to the homogeneous theta quotien
 identified with its isotype by §5.2. -/
 theorem sLocalHomogeneousThetaPrincipalValue_isClosedEmbedding {T : Finset V} (hT : T ⊆ S)
     (ψ : PontryaginDual J₁) : IsClosedEmbedding (sLocalHomogeneousThetaPrincipalValue hT ψ) :=
-  by sorry
+  by
+  classical
+  let K := LinearMap.ker (thetaAt(ψ))
+  rcases T.eq_empty_or_nonempty with rfl | hn
+  · have conjugate {E G Y : Type _} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+        [AddCommGroup G] [Module ℂ G] [TopologicalSpace G]
+        [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+        (e : InductiveTensor E G ≃L[ℂ] Y) (P : G →ₗ[ℂ] G) (hp : ∀ x, P x = x) :
+        e.toLinearMap.comp ((TensorProduct.map (LinearMap.id : E →ₗ[ℂ] E) P).comp e.symm.toLinearMap)
+          = LinearMap.id := by
+      have he : P = LinearMap.id := LinearMap.ext hp
+      subst he
+      refine LinearMap.ext fun x ↦ ?_
+      have h := LinearMap.congr_fun (TensorProduct.map_id (R := ℂ) (M := E) (N := G)) (e.symm x)
+      exact (congrArg e h).trans (e.apply_symm_apply x)
+    have hP : sAdelePrincipalValue F hT = LinearMap.id := by
+      unfold sAdelePrincipalValue
+      refine conjugate _ _ fun x ↦ ?_
+      simp only [Finset.notMem_empty, ite_false, PiTensorProduct.map_id]
+      rfl
+    have hU : ⇑(sLocalHomogeneousThetaPrincipalValue hT ψ) = id := by
+      funext y
+      obtain ⟨f, rfl⟩ := K.mkQ_surjective y
+      exact congrArg K.mkQ (LinearMap.congr_fun hP f)
+    rw [hU]
+    exact IsClosedEmbedding.id
+  · obtain ⟨hs, e, he⟩ := sLocalThetaIsotypicAverage_equiv (F := F) (S := S) ψ
+    let j := Subtype.val ∘ e
+    have hj : IsClosedEmbedding j := hs.isClosedEmbedding_subtypeVal.comp e.toHomeomorph.isClosedEmbedding
+    have hcomp : j ∘ sLocalHomogeneousThetaPrincipalValue hT ψ = sLocalThetaPrincipalValue F hT ∘ j := by
+      funext y
+      obtain ⟨f, rfl⟩ := K.mkQ_surjective y
+      exact (he (sAdelePrincipalValue F hT f)).trans
+        ((sLocalThetaPrincipalValue_isotypicAverage (F := F) hT ψ (Submodule.Quotient.mk f)).symm.trans
+          (congrArg (sLocalThetaPrincipalValue F hT) (he f).symm))
+    apply hj.of_comp_iff.mp
+    rw [hcomp]
+    exact (sLocalThetaPrincipalValue_isClosedEmbedding (F := F) hT hn).comp hj
 
 /-- Paper: Proposition 5.3.4.5(3), p. 264.
 The principal value range in the homogeneous theta quotient is the image of tests

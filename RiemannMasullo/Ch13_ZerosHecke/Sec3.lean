@@ -1,9 +1,9 @@
 module
 
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
-import all RiemannMasullo.Ch10_TraceSpectral.Sec1
-import all RiemannMasullo.AppB_AnalyticNT.Sec4b
-import all RiemannMasullo.AppD_SchwartzBruhat.Sec1c
+import RiemannMasullo.Ch10_TraceSpectral.Sec1
+import RiemannMasullo.AppB_AnalyticNT.Sec4b
+import RiemannMasullo.AppD_SchwartzBruhat.Sec1c
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec2b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec3b
 

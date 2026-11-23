@@ -3,10 +3,12 @@ module
 public import RiemannMasullo.Ch13_ZerosHecke.Sec3
 public import RiemannMasullo.AppB_AnalyticNT.Sec6
 import RiemannMasullo.External.TauCeti.Analysis.Complex.Conformal.Montel.Basic
-import all RiemannMasullo.Ch10_TraceSpectral.Sec1
-import all RiemannMasullo.AppB_AnalyticNT.Sec4b
+import RiemannMasullo.Ch10_TraceSpectral.Sec1
+import RiemannMasullo.AppB_AnalyticNT.Sec4b
 
 import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec5
+import all RiemannMasullo.Ch03_IdelicZeta.Sec2
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec3b
 
 /-! # From the trace formula to GRH
 
@@ -79,7 +81,49 @@ theorem introTraceTest_mellin (χ : U𝔽) (h : ℝ → ℂ) (φ : D𝔽)
     (_hφ : ∀ g, φ.val g = introTraceTest χ h g) (s : ℂ) :
     let f := fun g : C𝔽 ↦ φ.val g * ideleClassNormTwist χ s g
     Integrable f (ideleClassTamagawaMeasure F) ∧
-      (∫ g, f g ∂ideleClassTamagawaMeasure F) = τVolume * introTraceMellin h s := by sorry
+      (∫ g, f g ∂ideleClassTamagawaMeasure F) = τVolume * introTraceMellin h s := by
+  let W (g : C𝔽) := φ.val g * ideleClassNormTwist χ s g
+  have hc : Continuous φ.val := schwartzBruhat_continuous
+    (⟨φ.val, bruhatCompactSupport_mem_schwartz φ.property⟩ : SchwartzBruhat C𝔽)
+  have hW : Continuous W := hc.mul (ideleClassNormTwist χ s).continuous
+  refine ⟨hW.integrable_of_hasCompactSupport
+    (show HasCompactSupport φ.val from φ.property.2).mul_right, ?_⟩
+  have hrad (g : C𝔽) : W g = h (N(g)) * (N(g) : ℂ) ^ s := by
+    change φ.val g * ((χ g : ℂ) * (N(g) : ℂ) ^ s) = _
+    rw [_hφ, introTraceTest]
+    have hu : star (χ g : ℂ) * (χ g : ℂ) = 1 := by simp [← Circle.coe_inv_eq_conj]
+    linear_combination h (N(g)) * (N(g) : ℂ) ^ s * hu
+  let E : ℝ ≃ₜ ℝ≥0ˣ := Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+  let σ (x : ℝ) : C𝔽 := QuotientGroup.mk (canonicalIdeleNormSection F (E x))
+  have hσ : Continuous σ :=
+    continuous_quotient_mk'.comp ((canonicalIdeleNormSection_continuous F).comp E.continuous)
+  have hnorm (x : ℝ) : N(σ x) = Real.exp x :=
+    congrArg (fun t : ℝ≥0ˣ ↦ (t.val : ℝ)) (canonicalIdeleNormSection_rightInverse F (E x))
+  let l (g : C𝔽) := Real.log (N(g))
+  have hl : Measurable l := Real.measurable_log.comp
+    ((NNReal.continuous_coe.comp Units.continuous_val).comp
+      (isProperMap_ideleClassNorm F).continuous).measurable
+  have hsec (g : C𝔽) : W (σ (l g)) = W g := by
+    have he : Real.exp (l g) = N(g) := Real.exp_log (Units.zero_lt (ideleClassNorm F g))
+    rw [hrad, hrad, hnorm, he]
+  have hmellin : (∫ x : ℝ, W (σ x)) = introTraceMellin h s := by
+    rw [introTraceMellin, mellin, ← integral_comp_exp]
+    refine integral_congr_ae (.of_forall fun x ↦ ?_)
+    beta_reduce
+    rw [hrad, hnorm, Complex.real_smul, smul_eq_mul]
+    have he : (Real.exp x : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (Real.exp_pos x).ne'
+    rw [show (s : ℂ) = (s - 1) + 1 by ring, Complex.cpow_add _ _ he,
+      Complex.cpow_one, add_sub_cancel_right]
+    ring
+  change (∫ g, W g ∂ideleClassTamagawaMeasure F) = _
+  calc
+    _ = ∫ x, W (σ x) ∂(ideleClassTamagawaMeasure F).map l := by
+      rw [integral_map (f := fun x ↦ W (σ x)) hl.aemeasurable (hW.comp hσ).aestronglyMeasurable]
+      exact integral_congr_ae (.of_forall fun g ↦ (hsec g).symm)
+    _ = _ := by
+      rw [show (ideleClassTamagawaMeasure F).map l = _ from classTamagawa_map_log_norm (F := F),
+        integral_smul_nnreal_measure, hmellin]
+      rfl
 
 local notation "archClass(" w ")" => IdeleClassGroup.ofCompletion (𝓞 F) F w
 local notation "archIntegrand(" χ ", " h ", " w ")" =>
@@ -924,7 +968,62 @@ theorem introTrace_completedL_no_right_zeros (τ : ℝ≥0ˣ →ₜ* C𝔽)
     (_h : ∀ (ψ : U𝔽), (∀ t, ψ (τ t) = 1) →
       ∀ s : ℂ, 1 / 2 < s.re → meromorphicOrderAt finiteL(ψ) s ≤ 0)
     (χ : U𝔽) (s : ℂ) (_hs : 1 / 2 < s.re) :
-    meromorphicOrderAt (continuedCompletedHeckeL χ) s ≤ 0 := by sorry
+    meromorphicOrderAt (continuedCompletedHeckeL χ) s ≤ 0 := by
+  let n : C𝔽 →ₜ* ℝ≥0ˣ := ⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩
+  let j : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+  obtain ⟨a, ⟨ha, hpower⟩, -⟩ :=
+    existsUnique_unitaryComplexPower (j.comp (χ.comp τ)) (fun t ↦ Circle.norm_coe _)
+  let η : U𝔽 := χ.comp (τ.comp n)
+  let ψ : U𝔽 := χ / η
+  have hnorm (t : ℝ≥0ˣ) : ψ (τ t) = 1 := by
+    change χ (τ t) / χ (τ (ideleClassNorm F (τ t))) = 1
+    rw [_hτ t, div_self']
+  have htwist : ideleClassNormTwist ψ 0 = ideleClassNormTwist χ (-a) := by
+    ext1 g
+    change ((χ g : ℂ) / (χ (τ (ideleClassNorm F g)) : ℂ)) *
+      (N(g) : ℂ) ^ (0 : ℂ) = (χ g : ℂ) * (N(g) : ℂ) ^ (-a)
+    rw [Complex.cpow_zero, mul_one, Complex.cpow_neg, div_eq_mul_inv]
+    exact congrArg (fun w : ℂ ↦ (χ g : ℂ) * w⁻¹) (hpower (ideleClassNorm F g))
+  let G (z : ℂ) := (heckeGammaFactor χ z)⁻¹
+  let L := continuedCompletedHeckeL χ
+  let H (z : ℂ) := finiteL(ψ) (z + a)
+  have hG : Differentiable ℂ G := differentiable_inv_heckeGammaFactor χ
+  have hL := continuedCompletedHeckeL_spec χ
+  have hF := (finiteHeckeL_exists_continuation ψ).choose_spec
+  have hH : MeromorphicOn H univ := fun z _ ↦
+    ((hF.1 (mem_univ (z + a))).meromorphicAt).comp_analyticAt (g := fun w : ℂ ↦ w + a) (by fun_prop)
+  have hGL : MeromorphicOn (fun z ↦ G z * L z) univ :=
+    fun z hz ↦ (hG.analyticAt z).meromorphicAt.mul (hL.1 hz).meromorphicAt
+  have hEq (z : ℂ) (hz : 1 < z.re) : H z = G z * L z := by
+    have hw : 1 < (z + a).re := by rwa [Complex.add_re, ha, add_zero]
+    let w : {z : ℂ // 1 < z.re} := ⟨z, hz⟩
+    have ht : finiteHeckeL ψ ⟨z + a, hw⟩ = finiteHeckeL χ w := by
+      simpa [w, add_assoc] using
+        finiteHeckeL_imaginary_twist χ ψ (-a) (by simp [ha]) htwist ⟨z + a, hw⟩
+    calc
+      H z = finiteHeckeL ψ ⟨z + a, hw⟩ := hF.2 ⟨z + a, hw⟩
+      _ = finiteHeckeL χ w := ht
+      _ = G z * completedHeckeL χ w :=
+        (inv_mul_cancel_left₀ (heckeGammaFactor_ne_zero_of_re_pos χ (zero_lt_one.trans hz)) _).symm
+      _ = G z * L z := congrArg (G z * ·) (hL.2 w).symm
+  have hnear : ∀ᶠ z in 𝓝 (2 : ℂ), 1 < z.re :=
+    (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+  have htop : meromorphicOrderAt (H - fun z ↦ G z * L z) 2 = ⊤ :=
+    meromorphicOrderAt_eq_top_iff.mpr (eventuallyEq_iff_sub.mp
+      ((hnear.mono hEq).filter_mono nhdsWithin_le_nhds))
+  have ho := (hH.sub hGL).meromorphicOrderAt_eq_top_of_isPreconnected
+    isPreconnected_univ (mem_univ (2 : ℂ)) (mem_univ s) htop
+  have hlocal : H =ᶠ[𝓝[≠] s] (fun z ↦ G z * L z) :=
+    eventuallyEq_iff_sub.mpr (meromorphicOrderAt_eq_top_iff.mp ho)
+  have hord : meromorphicOrderAt H s = meromorphicOrderAt L s := by
+    rw [meromorphicOrderAt_congr hlocal]
+    exact meromorphicOrderAt_mul_of_ne_zero (hG.analyticAt s)
+      (inv_ne_zero (heckeGammaFactor_ne_zero_of_re_pos χ (by linarith)))
+  change meromorphicOrderAt L s ≤ 0
+  rw [← hord]
+  change meromorphicOrderAt (fun z ↦ finiteL(ψ) (z + a)) s ≤ 0
+  rw [meromorphicOrderAt_fun_comp_add_const_eq_meromorphicOrderAt]
+  exact _h ψ hnorm (s + a) (by rwa [Complex.add_re, ha, add_zero])
 
 /-- Paper: §1.4.5, p. 30. The completed functional equation reflects the
 zero-free region for the inverse character to the left of one half for the
