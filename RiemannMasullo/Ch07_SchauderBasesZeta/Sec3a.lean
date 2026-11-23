@@ -388,9 +388,6 @@ private theorem sLocalOrbitalPrincipalPart_range_le_ker_test {T : Finset V} (hT 
   have e3 := sLocalOrbitalPrincipalPart_range_le_ker_core hT f j.val.1 j.val.2 j.property.2
   exact (congrArg _ e1).trans (e2.trans e3)
 
--- TODO(paper-gap): Theorem 7.2.1.1(4) describes a pole-bound subspace. The reverse
--- inclusion below requires division by the selected reciprocal Euler factors in the
--- componentwise Mellin image. Proposition 7.2.2.1 assumes unramifiedness outside T.
 /-- Paper: Theorem 7.3.1.2(1), p. 341.
 Every homogeneous theta class whose zeta transform obeys the remaining pole bound
 on the component lies in the image of the finite principal value.
@@ -400,7 +397,44 @@ theorem sLocalThetaPoleBound_le_orbitalPrincipalValue {T : Finset V} (hT : T ⊆
     (_hne : T.Nonempty) (_hS : IsSaturatedPlaceSet S) (_hPic : PicTrivial)
     (ω : PontryaginDual J₁) :
     sLocalThetaPoleBound ω (fun c ↦ sLocalRhoPoleOrder c - sLocalFinitePoleMultiplicity T c) ≤
-      PV(T, hT, ω) := by sorry
+      PV(T, hT, ω) := by
+  obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+  obtain ⟨η, hη, _⟩ := exists_character_on_split mₛ
+    (isProperMap_sIdeleQuotientNorm F S).continuous σ hσ ω 1
+  obtain ⟨χ, hχ, hχrest, _⟩ := sLocal_character_extension η
+  let C₁ := (ideleClassNorm F).ker
+  let χ₀ := (circleToComplex).comp χ
+  let ω𝔽 : PontryaginDual C₁ :=
+    χ.comp (⟨C₁.subtype, continuous_subtype_val⟩ : C₁ →ₜ* _)
+  have hχ₀ : ideleClassNormTwist χ 0 = χ₀ := by
+    ext1 g
+    change (χ g : ℂ) * _ ^ (0 : ℂ) = (χ g : ℂ)
+    simp
+  have hu : χ₀ ∈ unramifiedOutside F S := hχ₀ ▸ hχ
+  have hbase : sIdeleRestriction F S ⟨χ₀, hu⟩ = (circleToComplex).comp η := by
+    have hsub : (⟨χ₀, hu⟩ : unramifiedOutside F S) = ⟨ideleClassNormTwist χ 0, hχ⟩ :=
+      Subtype.ext hχ₀.symm
+    rw [hsub, hχrest]
+    ext1 g
+    change (η g : ℂ) * _ ^ (0 : ℂ) = (η g : ℂ)
+    simp
+  let hω : NormOneCharacterUnramifiedOutside ω𝔽 S := ⟨⟨χ₀, hu⟩, fun _ ↦ rfl⟩
+  have hωlocal : sLocalNormOneCharacter S ω𝔽 hω = ω := by
+    apply ContinuousMonoidHom.ext
+    intro y
+    apply Subtype.ext
+    exact (sLocalNormOneCharacter_eq_sIdeleRestriction ω𝔽 ⟨χ₀, hu⟩ (fun _ ↦ rfl) y).trans
+      ((DFunLike.congr_fun hbase y.val).trans (congrArg Subtype.val (hη y)))
+  rintro x hx
+  obtain ⟨f, rfl⟩ := (Kₛ(ω)).mkQ_surjective x
+  have hbound := (mem_sLocalThetaPoleBound_iff ω _ ((Kₛ(ω)).mkQ f)).mp hx
+  have hcoeff (c : Xₛ) (hc : onComponent(c, ω)) (hn : 0 < sLocalFinitePoleMultiplicity T c)
+      (k : ℕ) (hk : sLocalRhoPoleOrder c - sLocalFinitePoleMultiplicity T c < k)
+      (hkr : k ≤ sLocalRhoPoleOrder c) : sLocalPrincipalPartCoeff c k f = 0 := by
+    rw [sLocalPrincipalPartCoeff_apply, ← sLocalThetaPrincipalPartCoeff_mk ω c hc k f]
+    exact hbound c hc (by omega) k hk
+  rw [← hωlocal] at hcoeff ⊢
+  exact sLocalPrincipalValue_mem_range_of_coeff_eq_zero hT _hne _hPic χ hu f hcoeff
 
 /-- The principal-value range lies in the pole-bound subspace: on the component, the
 zeta transform of a principal value has the selected Euler poles removed. -/
