@@ -924,7 +924,62 @@ theorem introTrace_completedL_no_right_zeros (τ : ℝ≥0ˣ →ₜ* C𝔽)
     (_h : ∀ (ψ : U𝔽), (∀ t, ψ (τ t) = 1) →
       ∀ s : ℂ, 1 / 2 < s.re → meromorphicOrderAt finiteL(ψ) s ≤ 0)
     (χ : U𝔽) (s : ℂ) (_hs : 1 / 2 < s.re) :
-    meromorphicOrderAt (continuedCompletedHeckeL χ) s ≤ 0 := by sorry
+    meromorphicOrderAt (continuedCompletedHeckeL χ) s ≤ 0 := by
+  let n : C𝔽 →ₜ* ℝ≥0ˣ := ⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩
+  let j : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+  obtain ⟨a, ⟨ha, hpower⟩, -⟩ :=
+    existsUnique_unitaryComplexPower (j.comp (χ.comp τ)) (fun t ↦ Circle.norm_coe _)
+  let η : U𝔽 := χ.comp (τ.comp n)
+  let ψ : U𝔽 := χ / η
+  have hnorm (t : ℝ≥0ˣ) : ψ (τ t) = 1 := by
+    change χ (τ t) / χ (τ (ideleClassNorm F (τ t))) = 1
+    rw [_hτ t, div_self']
+  have htwist : ideleClassNormTwist ψ 0 = ideleClassNormTwist χ (-a) := by
+    ext1 g
+    change ((χ g : ℂ) / (χ (τ (ideleClassNorm F g)) : ℂ)) *
+      (N(g) : ℂ) ^ (0 : ℂ) = (χ g : ℂ) * (N(g) : ℂ) ^ (-a)
+    rw [Complex.cpow_zero, mul_one, Complex.cpow_neg, div_eq_mul_inv]
+    exact congrArg (fun w : ℂ ↦ (χ g : ℂ) * w⁻¹) (hpower (ideleClassNorm F g))
+  let G (z : ℂ) := (heckeGammaFactor χ z)⁻¹
+  let L := continuedCompletedHeckeL χ
+  let H (z : ℂ) := finiteL(ψ) (z + a)
+  have hG : Differentiable ℂ G := differentiable_inv_heckeGammaFactor χ
+  have hL := continuedCompletedHeckeL_spec χ
+  have hF := (finiteHeckeL_exists_continuation ψ).choose_spec
+  have hH : MeromorphicOn H univ := fun z _ ↦
+    ((hF.1 (mem_univ (z + a))).meromorphicAt).comp_analyticAt (g := fun w : ℂ ↦ w + a) (by fun_prop)
+  have hGL : MeromorphicOn (fun z ↦ G z * L z) univ :=
+    fun z hz ↦ (hG.analyticAt z).meromorphicAt.mul (hL.1 hz).meromorphicAt
+  have hEq (z : ℂ) (hz : 1 < z.re) : H z = G z * L z := by
+    have hw : 1 < (z + a).re := by rwa [Complex.add_re, ha, add_zero]
+    let w : {z : ℂ // 1 < z.re} := ⟨z, hz⟩
+    have ht : finiteHeckeL ψ ⟨z + a, hw⟩ = finiteHeckeL χ w := by
+      simpa [w, add_assoc] using
+        finiteHeckeL_imaginary_twist χ ψ (-a) (by simp [ha]) htwist ⟨z + a, hw⟩
+    calc
+      H z = finiteHeckeL ψ ⟨z + a, hw⟩ := hF.2 ⟨z + a, hw⟩
+      _ = finiteHeckeL χ w := ht
+      _ = G z * completedHeckeL χ w :=
+        (inv_mul_cancel_left₀ (heckeGammaFactor_ne_zero_of_re_pos χ (zero_lt_one.trans hz)) _).symm
+      _ = G z * L z := congrArg (G z * ·) (hL.2 w).symm
+  have hnear : ∀ᶠ z in 𝓝 (2 : ℂ), 1 < z.re :=
+    (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+  have htop : meromorphicOrderAt (H - fun z ↦ G z * L z) 2 = ⊤ :=
+    meromorphicOrderAt_eq_top_iff.mpr (eventuallyEq_iff_sub.mp
+      ((hnear.mono hEq).filter_mono nhdsWithin_le_nhds))
+  have ho := (hH.sub hGL).meromorphicOrderAt_eq_top_of_isPreconnected
+    isPreconnected_univ (mem_univ (2 : ℂ)) (mem_univ s) htop
+  have hlocal : H =ᶠ[𝓝[≠] s] (fun z ↦ G z * L z) :=
+    eventuallyEq_iff_sub.mpr (meromorphicOrderAt_eq_top_iff.mp ho)
+  have hord : meromorphicOrderAt H s = meromorphicOrderAt L s := by
+    rw [meromorphicOrderAt_congr hlocal]
+    exact meromorphicOrderAt_mul_of_ne_zero (hG.analyticAt s)
+      (inv_ne_zero (heckeGammaFactor_ne_zero_of_re_pos χ (by linarith)))
+  change meromorphicOrderAt L s ≤ 0
+  rw [← hord]
+  change meromorphicOrderAt (fun z ↦ finiteL(ψ) (z + a)) s ≤ 0
+  rw [meromorphicOrderAt_fun_comp_add_const_eq_meromorphicOrderAt]
+  exact _h ψ hnorm (s + a) (by rwa [Complex.add_re, ha, add_zero])
 
 /-- Paper: §1.4.5, p. 30. The completed functional equation reflects the
 zero-free region for the inverse character to the left of one half for the
