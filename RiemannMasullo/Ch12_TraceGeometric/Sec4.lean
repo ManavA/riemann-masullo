@@ -4,11 +4,11 @@ public import RiemannMasullo.Ch12_TraceGeometric.Sec2
 public import RiemannMasullo.Ch11_ShellStructure.Sec2b
 public import RiemannMasullo.AppB_AnalyticNT.Sec4b
 public import RiemannMasullo.Ch06_LocalGlobal.Sec1
-import all RiemannMasullo.AppB_AnalyticNT.Sec4b
 import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec5
 import RiemannMasullo.AppD_SchwartzBruhat.Sec1c
 import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Count
 import Mathlib.Analysis.SpecialFunctions.SmoothTransition
+import all RiemannMasullo.AppB_AnalyticNT.Sec4b
 
 /-! # S-local trace calculation
 
