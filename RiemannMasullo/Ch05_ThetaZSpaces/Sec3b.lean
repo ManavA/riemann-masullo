@@ -12,6 +12,7 @@ import all RiemannMasullo.AppD_SchwartzBruhat.Sec3a_part2
 import all RiemannMasullo.Ch02_AdelicTheta.Sec1
 import Mathlib.Analysis.Calculus.InverseFunctionTheorem.ContDiff
 import Mathlib.Analysis.SpecialFunctions.Exponential
+import Mathlib.Geometry.Manifold.PartitionOfUnity
 import Mathlib.Topology.Algebra.IsOpenUnits
 import RiemannMasullo.ForMathlib.Analysis.Normed.Field.ProperSpace
 
@@ -101,17 +102,93 @@ theorem complexSchwartz_restrict_positiveDecay :
     ∃ R : 𝓢(ℂ, ℂ) →L[ℂ] 𝓔(ℂ, 2, Ioi 0), Injective R ∧
       ∀ (f : 𝓢(ℂ, ℂ)) (u : ℂˣ), (R f).val u = f u.val := by sorry
 
+open scoped Manifold in
+private theorem puncturedTest_mul_equiv {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    [FiniteDimensional ℝ E] (a : E → ℂ) (ha : ContDiff ℝ ∞ a)
+    (ha₀ : ∀ x ≠ 0, a x ≠ 0) :
+    ∃ M : 𝒟₀(E) ≃L[ℂ] 𝒟₀(E), ∀ f x, M f x = a x * f x := by
+  let Ω := punctured(E)
+  have mulSmooth (b : E → ℂ) (hb : ContDiffOn ℝ ∞ b Ω) (f : E → ℂ)
+      (hf : ContDiff ℝ ∞ f) (hs : ∀ x ∉ Ω, ∀ᶠ y in 𝓝 x, f y = 0) :
+      ContDiff ℝ ∞ (fun x ↦ b x * f x) := by
+    rw [contDiff_iff_contDiffAt]
+    intro x
+    by_cases hx : x ∈ Ω
+    · exact ((hb x hx).contDiffAt (Ω.isOpen.mem_nhds hx)).mul hf.contDiffAt
+    · apply (contDiffAt_const (c := (0 : ℂ))).congr_of_eventuallyEq
+      filter_upwards [hs x hx] with y hy
+      simp [hy]
+  have mulCLM (b : E → ℂ) (hb : ContDiffOn ℝ ∞ b Ω) :
+      ∃ T : 𝓓(Ω, ℂ) →L[ℂ] 𝓓(Ω, ℂ), ∀ f x, T f x = b x * f x := by
+    have zeroLocally (f : 𝓓(Ω, ℂ)) (x : E) (hx : x ∉ Ω) : ∀ᶠ y in 𝓝 x, f y = 0 := by
+      have hxf : x ∉ tsupport f := fun h ↦ hx (f.tsupport_subset h)
+      filter_upwards [isClosed_closure.isOpen_compl.mem_nhds hxf] with y hy
+      exact notMem_support.mp fun h ↦ hy (subset_closure h)
+    let F (f : 𝓓(Ω, ℂ)) : 𝓓(Ω, ℂ) :=
+      ⟨fun x ↦ b x * f x, mulSmooth b hb f f.contDiff (zeroLocally f),
+        f.hasCompactSupport.mono (support_mul_subset_right b f),
+        tsupport_mul_subset_right.trans f.tsupport_subset⟩
+    refine ⟨TestFunction.mkCLM ℂ F ?_ ?_ ?_, fun _ _ ↦ rfl⟩
+    · intro f g
+      ext x
+      exact mul_add _ _ _
+    · intro c f
+      ext x
+      exact mul_left_comm _ _ _
+    · intro K hK
+      -- On each fixed support stage, replace the multiplier by a globally smooth one.
+      obtain ⟨χ, hχ₀, hχ₁, _⟩ :=
+        exists_contMDiffMap_zero_one_nhds_of_isClosed (𝓘(ℝ, E)) Ω.isOpen.isClosed_compl
+          K.isCompact.isClosed (disjoint_left.mpr (fun _ hx hy ↦ hx (hK hy))) (n := (⊤ : ℕ∞))
+      have hχ : ContDiff ℝ ∞ (fun x ↦ (χ x : ℂ)) :=
+        Complex.ofRealCLM.contDiff.comp (contMDiff_iff_contDiff.mp χ.contMDiff)
+      have h : ContDiff ℝ ∞ (fun x ↦ b x * (χ x : ℂ)) :=
+        mulSmooth b hb _ hχ fun x hx ↦ by
+          filter_upwards [hχ₀.filter_mono (nhds_le_nhdsSet hx)] with y hy
+          simp [hy]
+      let L := ContDiffMapSupportedIn.bilinLeftCLM (K := K) (ContinuousLinearMap.mul ℂ ℂ) h
+      refine ((TestFunction.continuous_ofSupportedIn hK).comp L.continuous).congr ?_
+      intro f
+      ext x
+      change (f x) * (b x * (χ x : ℂ)) = b x * f x
+      by_cases hx : x ∈ K
+      · have he := hχ₁.self_of_nhdsSet x hx
+        simp [he, mul_comm]
+      · have hf := notMem_support.mp (fun hh ↦ hx (f.tsupport_subset (subset_closure hh)))
+        simp [hf]
+  obtain ⟨M, hM⟩ := mulCLM a ha.contDiffOn
+  obtain ⟨N, hN⟩ := mulCLM (fun x ↦ (a x)⁻¹) (ha.contDiffOn.inv ha₀)
+  have hcomp (f : 𝓓(Ω, ℂ)) (x : E) :
+      N (M f) x = f x ∧ M (N f) x = f x := by
+    rw [hN, hM, hM, hN]
+    by_cases hx : x = 0
+    · have hf : f x = 0 :=
+        notMem_support.mp (fun h ↦ (f.tsupport_subset (subset_closure h)) (by simp [hx]))
+      simp [hf]
+    · simp [ha₀ x hx]
+  let e : 𝓓(Ω, ℂ) ≃ₗ[ℂ] 𝓓(Ω, ℂ) :=
+    { M.toLinearMap with
+      invFun := N
+      left_inv := fun f ↦ TestFunction.ext (fun x ↦ (hcomp f x).1)
+      right_inv := fun f ↦ TestFunction.ext (fun x ↦ (hcomp f x).2) }
+  exact ⟨⟨e, M.continuous, N.continuous⟩, hM⟩
+
 /-- Paper: Proposition 5.3.3.2(1), p. 249.
 Multiplication by the real coordinate is a linear homeomorphism on compactly supported
 smooth tests on the punctured real line. -/
 theorem realCoordinate_mul_puncturedTest :
-    ∃ M : 𝒟₀(ℝ) ≃L[ℂ] 𝒟₀(ℝ), ∀ f x, M f x = (x : ℂ) * f x := by sorry
+    ∃ M : 𝒟₀(ℝ) ≃L[ℂ] 𝒟₀(ℝ), ∀ f x, M f x = (x : ℂ) * f x := by
+  exact puncturedTest_mul_equiv (fun x : ℝ ↦ (x : ℂ)) Complex.ofRealCLM.contDiff
+    (fun x hx ↦ by exact_mod_cast hx)
 
 /-- Paper: Proposition 5.3.3.2(1), p. 249.
 Multiplication by either complex coordinate, z or its conjugate, is a linear homeomorphism
 on compactly supported smooth tests on the punctured complex plane. -/
 theorem complexCoordinate_mul_puncturedTest (conjugate : Bool) :
-    ∃ M : 𝒟₀(ℂ) ≃L[ℂ] 𝒟₀(ℂ), ∀ f z, M f z = complexCoordinate(conjugate) z * f z := by sorry
+    ∃ M : 𝒟₀(ℂ) ≃L[ℂ] 𝒟₀(ℂ), ∀ f z, M f z = complexCoordinate(conjugate) z * f z := by
+  cases conjugate
+  · exact puncturedTest_mul_equiv id contDiff_id (fun _ hx ↦ hx)
+  · exact puncturedTest_mul_equiv star Complex.conjCLE.contDiff (fun z hz ↦ by simpa using hz)
 
 private theorem realCoordinate_mul_exponentialDecay_good : IsBruhatGoodSubgroup (⊥ : Subgroup ℝˣ) := by
   let e : EuclideanSpace ℝ (Fin 1) ≃L[ℝ] ℝ := PiLp.equivOfUnique 2 ℝ _
