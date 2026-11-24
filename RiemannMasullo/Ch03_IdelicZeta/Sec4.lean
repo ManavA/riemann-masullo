@@ -2583,7 +2583,9 @@ private theorem locallyConstant_unitTranslate {K : Type*} [NormedField K] [Prope
   have h := hu ((↑g⁻¹ : K) * x)
   simpa only [mul_inv_rev, inv_inv, Units.val_mul, mul_assoc, Units.mul_inv_cancel_left] using h
 
-private theorem finiteTest_translate_locallyConstant (v : V) (f : ℬ(v.adicCompletion F)) :
+/-- Translating a Schwartz-Bruhat function on a finite completion by a unit is locally constant in
+the unit. -/
+theorem finiteTest_translate_locallyConstant (v : V) (f : ℬ(v.adicCompletion F)) :
     IsLocallyConstant (fun g : (v.adicCompletion F)ˣ ↦ schwartzBruhatUnitTranslate g f) := by
   let : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
   have hU : IsOpen ((O(v)).units : Set (v.adicCompletion F)ˣ) := Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)
@@ -3010,6 +3012,14 @@ private theorem finiteIntegralOnRight_eigen (v : V) (χ : PontryaginDual (v.adic
   exact (integral_congr_ae (ae_of_all _ e)).trans
     ((integral_const_mul (c g) _).trans (congrArg (c g * ·) (integral_mul_left_eq_self (μ := μ(v)) b (g⁻¹))))
 
+/-- For `0 < re z`, some eigendistribution for the twist `χ |·|^z` at a finite place evaluates every
+Schwartz-Bruhat function to its local zeta integral against that twist. -/
+theorem exists_finiteEigendistribution_eq_zetaIntegral (v : V)
+    (χ : PontryaginDual (v.adicCompletion F)ˣ) (z : ℂ) (hz : 0 < z.re) :
+    ∃ D ∈ schwartzBruhatEigendistributions (ft(χ,v,z)),
+      ∀ f : ℬ(v.adicCompletion F), D f = localIdelicZetaIntegral (μ(v)) fn(f) (ft(χ,v,z)) :=
+  ⟨finiteIntegralOnRight v χ z hz, finiteIntegralOnRight_eigen v χ z hz, fun _ ↦ rfl⟩
+
 private def FiniteGaussianOnRight : Prop :=
   ∀ (v : V) (χ : PontryaginDual (v.adicCompletion F)ˣ)
     (z : ℂ) (_hz : 0 < z.re),
@@ -3251,7 +3261,9 @@ private theorem abs_exp_sub_sum_le (t : ℝ) (M : ℕ) :
     _ = |t| ^ M / (M.factorial : ℝ) * Real.exp |t| := by
       rw [tsum_mul_left, hsum_abs.tsum_eq]
 
-private theorem realSchwartzBruhat_surjective (w : InfinitePlace F) (hw : w.IsReal) :
+/-- At a real place, every Schwartz-Bruhat function on the completion comes from a Schwartz
+function on `ℝ` through a continuous linear map. -/
+theorem realSchwartzBruhat_surjective (w : InfinitePlace F) (hw : w.IsReal) :
     ∃ Φ : SchwartzMap ℝ ℂ →L[ℂ] SchwartzBruhat (Multiplicative w.Completion),
       Surjective Φ ∧
         ∀ (f : SchwartzMap ℝ ℂ) (x : w.Completion),
@@ -3330,7 +3342,9 @@ private theorem local_euclideanSchwartzMonomialPartial_eq {m : ℕ} (α β : Fin
     rfl
   exact (hcast (List.length_map L) (fun i ↦ L (d.get i))).symm
 
-private theorem complexSchwartzBruhat_surjective (w : InfinitePlace F) (hw : w.IsComplex) :
+/-- At a complex place, every Schwartz-Bruhat function on the completion comes from a Schwartz
+function on `ℂ` through a continuous linear map. -/
+theorem complexSchwartzBruhat_surjective (w : InfinitePlace F) (hw : w.IsComplex) :
     ∃ Φ : SchwartzMap ℂ ℂ →L[ℂ] SchwartzBruhat (Multiplicative w.Completion),
       Surjective Φ ∧
         ∀ (f : SchwartzMap ℂ ℂ) (x : w.Completion),
@@ -6655,7 +6669,8 @@ private theorem finite_twist_ne_one (χ : PontryaginDual C_F) (v : V) {z : ℂ} 
   rw [norm_one, norm_mul, Circle.norm_coe, one_mul, Complex.norm_cpow_eq_rpow_re_of_pos hpos] at hh
   exact (Real.rpow_lt_one hpos.le hlt hz).ne hh
 
-private theorem analytic_eval_normalized {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+/-- Pointwise evaluation of a holomorphic strong-dual family is entire. -/
+theorem analytic_eval_normalized {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
     [ContinuousSMul ℂ E] {D : ℂ → StrongDual ℂ E} (hD : VectorHolomorphicOn D univ) (f : E) :
     AnalyticOnNhd ℂ (fun z ↦ D z f) univ := by
   let e : StrongDual ℂ E →L[ℂ] ℂ := ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) f
@@ -7171,7 +7186,8 @@ private theorem stageProducts (χ : PontryaginDual C_F) (S : Finset V) :
     exact ContinuousLinearMap.ext fun f ↦ (congrArg U (k.symm_apply_apply f).symm).trans
       ((DFunLike.congr_fun eq (k f)).trans (congrArg W (k.symm_apply_apply f)))
 
-private theorem normalizedGaussian_ne_zero (χ : PontryaginDual C_F) (z : ℂ) (hz : 1 < z.re) :
+/-- The completed Gaussian zeta factor does not vanish in the half-plane of absolute convergence. -/
+theorem normalizedGaussian_ne_zero (χ : PontryaginDual C_F) (z : ℂ) (hz : 1 < z.re) :
     gaussianCompletedHeckeL χ z ≠ 0 := by
   rw [gaussianCompletedHeckeL_eq_completedHeckeL χ z hz]
   exact mul_ne_zero (Complex.ofReal_ne_zero.mpr (inv_ne_zero (Real.sqrt_ne_zero'.mpr
@@ -7728,7 +7744,8 @@ theorem adelicEigendistributions_rank (c : X) :
 
 local notation "DG(" χ ")" => (adelicEigendistribution_normalized (χ)).choose
 
-private theorem globalIntegral_normalized_ratio (χ : PontryaginDual C_F) {z : ℂ} (hz : 1 < z.re)
+/-- In the half-plane of convergence the global zeta integral is the Gaussian factor times the normalized eigendistribution. -/
+theorem globalIntegral_normalized_ratio (χ : PontryaginDual C_F) {z : ℂ} (hz : 1 < z.re)
     (f : ℬ(𝔸[F])) :
     globalIdelicZetaIntegral f (ideleClassNormTwist χ z) = gaussianCompletedHeckeL χ z * DG(χ) z f := by
   have ha := ideleClassNormTwist_abscissa χ z
