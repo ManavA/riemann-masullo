@@ -2365,7 +2365,7 @@ private theorem modulatedCompactSupportStage_periodization_equiv_surjective
     modulatedCompactSupportStage_periodization_equiv_sup_closed m γ hγ k hk
   let f₀ : G → ℂ := fun x ↦ ρc (Real.log ((m x).val : ℝ)) * φ (QuotientGroup.mk x)
   have hsm : IsBruhatSmooth f₀ := fun p ↦
-    modulatedPeriodization_surjective_mul (modulatedPeriodization_surjective_logProfile m hρs' p)
+    isBruhatContDiff_mul (modulatedPeriodization_surjective_logProfile m hρs' p)
       (modulatedPeriodization_surjective_comp_mk (Γ ⊔ k) (schwartzBruhat_isBruhatSmooth φ p))
   have hsupp : support f₀ ⊆ {x : G | Real.log ((m x).val : ℝ) ∈ Icc (c - L) (c + ε)} := by
     intro x hx
