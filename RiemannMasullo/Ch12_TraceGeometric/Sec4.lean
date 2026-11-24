@@ -86,7 +86,7 @@ private theorem sLocalTraceRestriction_invariant
     (ξ : Hₛ) (g : Iₛ) :
     φ.val (classAtS(ξ.val * g)) = φ.val (classAtS(g)) := by
   obtain ⟨v, hv⟩ := ξ
-  rw [MonoidHom.map_range] at hv
+  rw [sProjectedDiagonal, MonoidHom.map_range] at hv
   obtain ⟨u, rfl⟩ := hv
   let d := Units.map (integralAdeleDiagonal F S).toMonoidHom u
   let i := (integralAdelesOutside F S).subtype
